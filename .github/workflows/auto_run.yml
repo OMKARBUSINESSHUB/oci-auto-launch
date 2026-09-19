@@ -37,8 +37,9 @@ jobs:
           tenancy_id = config['tenancy']
           ad_name = identity.list_availability_domains(tenancy_id).data[0].name
 
-          images = compute.list_images(tenancy_id, operating_system="Canonical Ubuntu", shape_name="VM.Standard.A1.Flex").data
-          image_id = images[0].id
+          images = compute.list_images(tenancy_id, operating_system="Canonical Ubuntu").data
+          a1_images = [img for img in images if "aarch64" in img.display_name.lower() or "arm" in img.display_name.lower()]
+          image_id = a1_images[0].id if a1_images else images[0].id
 
           subnets = network.list_subnets(tenancy_id).data
           subnet_id = subnets[0].id
