@@ -44,13 +44,14 @@ jobs:
           subnets = network.list_subnets(tenancy_id).data
           subnet_id = subnets[0].id
 
+          # 3 OCPU ane 18 GB RAM સેટ કર્યું છે જેથી LimitExceeded ના આવે
           details = oci.core.models.LaunchInstanceDetails(
               compartment_id=tenancy_id,
               availability_domain=ad_name,
               shape="VM.Standard.A1.Flex",
               display_name="AlwaysFree-FastHost",
               image_id=image_id,
-              shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=4, memory_in_gbs=24),
+              shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=3, memory_in_gbs=18),
               create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id, assign_public_ip=True)
           )
 
