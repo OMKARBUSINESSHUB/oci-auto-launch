@@ -1,0 +1,65 @@
+name: OCI Auto Launch
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install OCI SDK
+        run: pip install oci
+
+      - name: Setup OCI Credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          sed -i 's|<path to your private keyfile> # TODO|~/.oci/oci_api_key.pem|g' ~/.oci/config
+          echo "${{ secrets.OCI_KEY }}" > ~/.oci/oci_api_key.pem
+
+      - name: Create Python Script
+        run: |
+          cat << 'EOF' > auto_launch.py
+          import oci, datetime
+
+          config = oci.config.from_file()
+          compute = oci.core.ComputeClient(config)
+          identity = oci.identity.IdentityClient(config)
+          network = oci.core.VirtualNetworkClient(config)
+
+          tenancy_id = config['tenancy']
+          ad_name = identity.list_availability_domains(tenancy_id).data[0].name
+
+          images = compute.list_images(tenancy_id, operating_system="Canonical Ubuntu", shape_name="VM.Standard.A1.Flex").data
+          image_id = images[0].id
+
+          subnets = network.list_subnets(tenancy_id).data
+          subnet_id = subnets[0].id
+
+          details = oci.core.models.LaunchInstanceDetails(
+              compartment_id=tenancy_id,
+              availability_domain=ad_name,
+              shape="VM.Standard.A1.Flex",
+              display_name="AlwaysFree-FastHost",
+              image_id=image_id,
+              shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=4, memory_in_gbs=24),
+              create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id, assign_public_ip=True)
+          )
+
+          try:
+              print(f"[{datetime.datetime.now()}] Attempting launch...")
+              compute.launch_instance(details)
+              print("SUCCESS: Instance Launched!")
+          except oci.exceptions.ServiceError as e:
+              print(f"Status: {e.code} - {e.message}")
+          EOF
+
+      - name: Run Auto Launch
+        run: python3 auto_launch.py
